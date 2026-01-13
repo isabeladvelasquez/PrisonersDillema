@@ -2,7 +2,7 @@
 *              Dilema do Prisioneiro - Densidade Total             *
 *                             15/11/2025                           *
 *******************************************************************/
-//gcc -Ilat2eps/lat2eps-master L100_M0_RHO1_S42.c lat2eps/lat2eps-master/lat2eps_lib.c -o rede_m0 -lm
+//gcc -Ilat2eps/lat2eps-master L100_RHO1_M0.c lat2eps/lat2eps-master/lat2eps_lib.c -o L100_RHO1_M0 -lm
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -18,7 +18,7 @@
 #define N (L * L)             //tamanho da rede
 #define MCS 10000             //tempo total de simulação
 
-#define SAVE_NET 0          //salvar o estado da rede no inicio e no fim
+#define SAVE_NET 1          //salvar o estado da rede no inicio e no fim
 
 /*******************************************************************
 *                       Declaração de Funções                      *
@@ -95,7 +95,7 @@ int densidade(){
 }
 
 //GRÁFICO_REDE
-void plot_lat(const char *name){
+void plot_lat(){
 if (SAVE_NET == 1){
     snprintf(name, sizeof(name), "m0_p1_t%d.eps", tempo);
     lat2eps_init(L,L);
@@ -115,19 +115,16 @@ if (SAVE_NET == 1){
 *                                 Simulação                                *
 ***************************************************************************/
 int main() {
-  srand(time(NULL)); //semente para a função rand
+  srand(42); //semente para a função rand
   rede(); //montando a rede
   pts_iniciais(); //pontuação incial de todos é 0
   estrategias(); //randomizando as estratégias
   densidade(); //densidade de C's no início da simulação
-  plot_lat(); //plotando o estado inicial da rede
+  plot_lat(name); //plotando o estado inicial da rede
 
   //Interações
   for (int k = 0; k < MCS; ++k) {
-    if((float)k % 500 == 0){
     pts_iniciais(); //zera a pontuação de todos para a próxima rodada
-    t[k/500] = k
-    pcp_tempo[k/500] = densidade()
     for (int i = 0; i < N; ++i){
       if (s[i] == 0) { //se o agente é D
         for (int j = 0; j < 4; ++j){
@@ -172,4 +169,3 @@ int main() {
 
   return 0;
 }
-
