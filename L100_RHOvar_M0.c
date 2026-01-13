@@ -1,29 +1,19 @@
 /***************************************************************************************
 *                        Dilema do Prisioneiro - Densidade Variável                    *
-*                                         15/11/2025                                   *
+*                                         24/11/2025                                   *
 ***************************************************************************************/
-//gcc -o 'L100_RHO(0-1)_M0' 'L100_RHO(0-1)_M0.c' -O3 -lgsl -lgslcblas -lm
+//gcc -o 'L100_RHOvar_M0' 'L100_RHOvar_M0.c' -I/home/isabela/IC/lat2eps/lat2eps-master/ -O3 -lgsl -lgslcblas -lm
+
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 #include <time.h>
 #include <gsl/gsl_rng.h>
-
-/****************************************************************************************
-*                                  Definição de Constantes                              *
-*                                                                                       *
-****************************************************************************************/
-
-#define L 100                 //tamanho de cada lado da rede (quadrada)
-#define N (L * L)             //tamanho da rede
-#define MCS 10000             //tempo total de simulação
-
-#define SAVE_CONFIG 0         //salvar a configuração final
-#define SAVE_TEMP 1          //salvar pc em relação ao tempo
+#include "lat2eps.h"
 
 /***************************************************************************************
-*                                  Declaração de Funções                               *
+*                                Random Numbers Functions                              *
 *                                                                                      *
 ***************************************************************************************/
 
@@ -36,27 +26,53 @@ void init_rng(unsigned long int seed) {
 }
 void liberar_rng() {gsl_rng_free(r);}
 
+//Random number between 0 and 1
+float randi() {return (float)gsl_rng_uniform(r);}
+
+/****************************************************************************************
+*                                  Definição de Constantes                              *
+*                                                                                       *
+****************************************************************************************/
+
+#define L 100                 //sites in each line of the net
+#define N (L * L)             //sites in the net
+#define MCS 10000             //maximum simulation time (MCS)
+
+#define S 0.0                 //pontuação de C quando encontra D
+#define TT 1.4                //pontuação de D quando encontra C
+#define R 1.0                 //pontuação de C quando encontra C
+#define P 0.0                 //pontuação de D quando encontra D
+
+#define SAVE_CONFIG 0         //salvar a configuração final
+#define SAVE_TEMP 0           //salvar pc em relação ao tempo
+#define SAVE_ATVSITE 0        //save the last config of the net showing active sites
+
+/***************************************************************************************
+*                               Declaring other Functions                              *
+*                                                                                      *
+***************************************************************************************/
+
 //Rede do sistema
 float rho; //densidade teórica da rede
 float n; //número de agentes na rede
 float p[21]; //densidade real total da rede
 float pcp[21]; //densidade de cooperadores pela densidade da rede
-float pcp_tempo[21][21]; //densidade de cooperadores pela densidade da rede em relação ao tempo
+float pcp_tempo[21][44]; //densidade de cooperadores pela densidade da rede em relação ao tempo
 
-//Tempo em MCS
-int t[21][21];
-//Pontos
-#define S 0.0                 //pontuação de C quando encontra D
-#define TT 1.4                //pontuação de D quando encontra C
-#define R 1.0                 //pontuação de C quando encontra C
-#define P 0.0                 //pontuação de D quando encontra D
+//Time in MCS
+int t[21][44];
+int timetarget[] = {1, 2, 3, 4, 5, 6, 7, 9, 11, 13, 16, 20, 24, 29, 35, 43, 52, 63, 77, 94, 115, 140, 170, 207, 252, 307, 374, 455, 554, 674, 820, 998, 1214, 1477, 1798, 2187, 2661, 3237, 3938, 4791, 5829, 7091, 8627, 10000};
+int savet = 0;
+
+//Points each agent has on the round
 float pontos[N];
 
 //Estratégias e posições iniciais
 int s[N]; //s[i] = 0 se for D, s[i] = 1 se for C e s[i] = 2 se o sítio for vazio
 int vizinhanca[N][4]; /*para cada i em N temos 4 vizinhos onde: [0] = direita; [1] = esquerda; [2] = acima; [3] = abaixo.*/
+int s_atv[N];
 
-//Rede de vizinhança
+//Neighborhood net
 void rede(){
     for (int i = 0; i < N; ++i) {
             if (i % L == L - 1) 
@@ -81,23 +97,18 @@ void rede(){
         }
     }
 
-//Pontuação inicial
+//Initial points
 void pts_iniciais(){for (int i = 0; i < N; ++i){pontos[i] = 0.0;}} //todos começam com 0 pontos em cada rodada
-
-//Números aleatórios entre 0 e 1
-float randi() {return (float)gsl_rng_uniform(r);}
 
 //Estratégias em função da densidade da rede
 void estrategias(){
     n = 0.0;
     for (int i = 0; i < N; i++){
-        if (randi() < rho) {
+        if (randi() <= rho) {
           n += 1;
           if (randi() < 0.5) s[i] = 0;
           else s[i] = 1;} 
-        else {s[i] = 2;}
-    }
-}
+        else {s[i] = 2; } } }
 
 //Densidade de C em N
 float densidade(){
@@ -154,6 +165,28 @@ int saveTemp(unsigned long seed){
     fprintf(fp1,"# seed rho p t pcp\n"); }
   else fp1 = stdout;}
 
+//Net graph
+void plot_atvsite(int time){
+if (SAVE_ATVSITE == 1){
+    snprintf(name, sizeof(name), "SDP(ATVS)_L100_RHO%.2f_M0_t%d.eps", rho, time);
+    lat2eps_init(L,L);
+    lat2eps_set_color(1,0x0115b2); // blue
+    lat2eps_set_color(0,0xFF0000); // red
+    lat2eps_set_color(2,0xFFFFFF); // white
+    lat2eps_set_color(3,0xdbc400); // yellow
+    
+    for (int j=0; j<N; ++j) {
+        if (s[j] == 1) lat2eps_set_site(j%L,j/L,1);
+        if (s[j] == 0) lat2eps_set_site(j%L,j/L,0);
+        if (s[j] == 2) lat2eps_set_site(j%L,j/L,2);
+        if (s_atv[j] == 1) lat2eps_set_site(j%L,j/L,3);
+        }
+
+    lat2eps_gen_eps(name,0,0,L,L,2,6);
+
+    lat2eps_release();
+}}
+
 /*****************************************************************************************************************************
 *                                                        Simulação                                                           *
 *****************************************************************************************************************************/
@@ -168,34 +201,33 @@ int main(){
   
   p[0] = 0;
   pcp[0] = 0;
-  for (int i = 0; i < 21; ++i){t[0][i] = 0; pcp_tempo[0][i] = 0;}
+  for (int i = 0; i < 44; ++i){t[0][i] = 0; pcp_tempo[0][i] = 0;}
   rede(); //montando a rede
 
 /********************************* Interações ******************************************************************************/
   for (int l = 1; l < 21; ++l){ //loop para determinar a densidade teórica
     rho = l/20.0;
     estrategias();
+    savet = 0;
+    for (int i = 0; i < N; ++i) {s_atv[i] = 0;}
+    plot_atvsite(0);
     for (int k = 0; k < MCS; ++k) { //loop para as interações
-      pts_iniciais(); 
-      if(SAVE_TEMP == 1 && k == 0){
-        t[l][0] = k;
-        pcp_tempo[l][0] = densidade();}
-        
+      pts_iniciais();
       for (int i = 0; i < N; ++i){ //jogo de cada jogador N
       
-        if (s[i] == 0) { //se o agente é D
+        if (s[i] == 0) { //agent chosen is D
           for (int j = 0; j < 4; ++j){
-            if (s[vizinhanca[i][j]] == 0){ //se o vizinho é D também
+            if (s[vizinhanca[i][j]] == 0){ //neighbor agent is D
               pontos[i] += P;}
-            if (s[vizinhanca[i][j]] == 1){ //se o vizinho é C
+            if (s[vizinhanca[i][j]] == 1){ //neighbor agent is C
                   pontos[i] += TT;}
           }
         }
-        if (s[i] == 1){ //se o agente é C
+        if (s[i] == 1){ //agent chosen is C
           for (int j = 0; j < 4; ++j){
-            if (s[vizinhanca[i][j]] == 0){ //se o vizinho é D
+            if (s[vizinhanca[i][j]] == 0){ //neighbor agent is D
               pontos[i] += S;}
-            if (s[vizinhanca[i][j]] == 1){ //se o vizinho é C também
+            if (s[vizinhanca[i][j]] == 1){ //neighbor agente is C
               pontos[i] += R;}
           }
         }
@@ -212,19 +244,23 @@ int main(){
             ponto = pontos[vizinhanca[i][j0]];
             agente = vizinhanca[i][j0];}
           j0 = (j0 + 1) % 4;}
-        s_novo[i] = s[agente];}
-      else s_novo[i] = 2;
-    }
-    for (int i = 0; i < N; ++i) {s[i] = s_novo[i];} 
+        s_novo[i] = s[agente]; }
+      else s_novo[i] = 2; }
+      
+    for (int i = 0; i < N; ++i) {
+      if (s_novo[i] != s[i]) s_atv[i] = 1; else s_atv[i] = 0;
+      s[i] = s_novo[i];} 
     
     p[l] = n/N;
-    if(SAVE_TEMP == 1 && (k + 1) % 500 == 0){
-      t[l][(k + 1)/500] = (k + 1);
-      pcp_tempo[l][(k + 1)/500] = densidade()/p[l];} } 
+    if(SAVE_TEMP == 1 && (k + 1) == timetarget[savet]){
+      t[l][savet] = k + 1;
+      pcp_tempo[l][savet] = densidade()/p[l];
+      savet += 1; } } 
     
 /*********************************** Recolhendo dados no final da simulação **************************************************/
+  plot_atvsite(10000);
   if (SAVE_CONFIG == 1){pcp[l] = densidade()/p[l];  fprintf(fp1,"%lu %.4f %.4f %.4f\n", seed, rho, p[l], pcp[l]);}
-  if (SAVE_TEMP == 1){for (int j = 0; j < 21; ++j)fprintf(fp1,"%lu %.4f %.4f %d %.4f\n", seed, rho, p[l], t[l][j], pcp_tempo[l][j]);}
+  if (SAVE_TEMP == 1){for (int j = 0; j < 44; ++j) fprintf(fp1,"%lu %.4f %.4f %d %.4f\n", seed, rho, p[l], t[l][j], pcp_tempo[l][j]);}
   }
 
   if (SAVE_CONFIG == 1 || SAVE_TEMP == 1) fclose(fp1);
