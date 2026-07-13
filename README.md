@@ -4,6 +4,6 @@ This repository contains the main codes that are being used to build a research 
 The problem of the research is a system with the same mobility probability for both strategies (C's and D's) were the density of agents in a net may vary for each simulation. At the beginning, two cooperators (C) are inserted in a net were all the other agents are desertors (D). Surprisingly, there are some cases where the two C's can spread and the net becomes cooperators only. We're trying to analyze the system through different parameters to understand this behavior.
 \
 \
-2C_L100_RHOvar_Mvar.c: simulation code. Putting #define SAVE_* = 1 will save different parameters ina .dat archive.
-analise.py: code to read and analyze .dat and generate graphics. To use it, just adjust the variables at the end and choose the right function to analyse your data.
+2C_L100_RHOvar_Mvar.c: simulation code. Putting #define SAVE_* = 1 will save different parameters ina .dat archive.\\
+analise.py: code to read and analyze .dat and generate graphics. To use it, just adjust the variables at the end and choose the right function to analyse your data.\\
 repeat.sh: routine to play the simulation code repeatedly, created a folder to save the data and move the data generated.
